@@ -8,6 +8,38 @@ export interface ShopifyData {
   dailyRevenue: Array<{ date: string; revenue: number }>;
 }
 
+// Module-level token cache
+let cachedToken: string | null = null;
+let tokenExpiresAt = 0;
+
+async function getShopifyToken(): Promise<string> {
+  if (cachedToken && Date.now() < tokenExpiresAt) {
+    return cachedToken;
+  }
+
+  const clientId = process.env.SHOPIFY_CLIENT_ID!;
+  const clientSecret = process.env.SHOPIFY_CLIENT_SECRET!;
+  const domain = process.env.SHOPIFY_SHOP_DOMAIN!;
+
+  const res = await fetch(`https://${domain}/admin/oauth/access_token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: `grant_type=client_credentials&client_id=${clientId}&client_secret=${clientSecret}`,
+  });
+
+  if (!res.ok) {
+    throw new Error(`Shopify token request failed ${res.status}: ${await res.text()}`);
+  }
+
+  const json = (await res.json()) as { access_token: string; expires_in?: number };
+  cachedToken = json.access_token;
+  // Default 24h if expires_in not provided, minus 60s buffer
+  const expiresIn = (json.expires_in || 86400) - 60;
+  tokenExpiresAt = Date.now() + expiresIn * 1000;
+
+  return cachedToken;
+}
+
 function dateRange(range: string): { start: string; end: string } {
   const end = new Date();
   const start = new Date();
@@ -21,16 +53,19 @@ function dateRange(range: string): { start: string; end: string } {
 }
 
 export async function fetchShopify(range: string = "30d"): Promise<ShopifyData> {
-  const token = process.env.SHOPIFY_ACCESS_TOKEN;
+  const clientId = process.env.SHOPIFY_CLIENT_ID;
+  const clientSecret = process.env.SHOPIFY_CLIENT_SECRET;
   const domain = process.env.SHOPIFY_SHOP_DOMAIN;
 
-  if (!token || !domain || token === "PENDING_NEW_ADMIN_TOKEN") {
+  if (!clientId || !clientSecret || !domain) {
     return { status: "pending_token", revenue: 0, orderCount: 0, aov: 0, topProducts: [], dailyRevenue: [] };
   }
 
   const { start, end } = dateRange(range);
 
   try {
+    const token = await getShopifyToken();
+
     const res = await fetch(
       `https://${domain}/admin/api/2024-01/orders.json?status=any&created_at_min=${start}&created_at_max=${end}&limit=250`,
       {
@@ -42,6 +77,8 @@ export async function fetchShopify(range: string = "30d"): Promise<ShopifyData> 
     );
 
     if (res.status === 401 || res.status === 403) {
+      cachedToken = null;
+      tokenExpiresAt = 0;
       return { status: "pending_token", revenue: 0, orderCount: 0, aov: 0, topProducts: [], dailyRevenue: [] };
     }
 

@@ -41,6 +41,12 @@ interface TopProduct {
   revenue: number;
 }
 
+interface StageBreakdown {
+  stage: string;
+  count: number;
+  value: number;
+}
+
 interface DashboardData {
   range: string;
   syncedAt: string;
@@ -61,17 +67,15 @@ interface DashboardData {
     topProducts: TopProduct[];
     dailyRevenue: DailyRevenue[];
   };
-  klaviyo: {
+  ghl: {
     status: "live" | "pending_token" | "error";
     error?: string;
-    received: number;
-    opened: number;
-    clicked: number;
-    bounced: number;
-    unsubscribed: number;
-    placedOrder: number;
-    openRate: number;
-    clickRate: number;
+    totalLeads: number;
+    newContacts: number;
+    pipelineValue: number;
+    wonDeals: number;
+    wonRevenue: number;
+    stageBreakdown: StageBreakdown[];
   };
 }
 
@@ -219,7 +223,7 @@ export default function Dashboard() {
 
   const meta = data?.meta;
   const shopify = data?.shopify;
-  const klaviyo = data?.klaviyo;
+  const ghl = data?.ghl;
 
   return (
     <>
@@ -288,7 +292,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* KPI Row 2 — Shopify + Klaviyo */}
+            {/* KPI Row 2 — Shopify + GHL */}
             <div className="kpi-grid">
               <div className="kpi-card">
                 <div className="kpi-label">Revenue</div>
@@ -312,11 +316,11 @@ export default function Dashboard() {
                 <div className="kpi-sub">Avg order value</div>
               </div>
               <div className="kpi-card">
-                <div className="kpi-label">Email Open Rate</div>
+                <div className="kpi-label">GHL Leads</div>
                 <div className="kpi-value">
-                  {klaviyo?.status === "pending_token" ? "Connecting..." : fmt(klaviyo?.openRate || 0, "percent")}
+                  {ghl?.status === "pending_token" ? "Connecting..." : fmt(ghl?.totalLeads || 0)}
                 </div>
-                <div className="kpi-sub">Klaviyo emails</div>
+                <div className="kpi-sub">Pipeline opportunities</div>
               </div>
             </div>
 
@@ -388,7 +392,7 @@ export default function Dashboard() {
                 </div>
               </div>
               {shopify?.status === "pending_token" ? (
-                <p style={{ color: "var(--warning)", fontSize: "0.9rem" }}>Awaiting Shopify Admin token — connect your store to see product data.</p>
+                <p style={{ color: "var(--warning)", fontSize: "0.9rem" }}>Awaiting Shopify credentials — connect your store to see product data.</p>
               ) : (
                 <table className="data-table">
                   <thead>
@@ -415,39 +419,61 @@ export default function Dashboard() {
               )}
             </div>
 
-            {/* Email Performance */}
+            {/* GHL Pipeline */}
             <div className="section">
               <div className="section-header">
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <span className="section-title">Email Performance</span>
-                  <Badge status={klaviyo?.status || "error"} />
+                  <span className="section-title">GHL Pipeline</span>
+                  <Badge status={ghl?.status || "error"} />
                 </div>
               </div>
-              {klaviyo?.status === "pending_token" ? (
-                <p style={{ color: "var(--warning)", fontSize: "0.9rem" }}>Awaiting Klaviyo API key verification — email metrics will appear once connected.</p>
+              {ghl?.status === "pending_token" ? (
+                <p style={{ color: "var(--warning)", fontSize: "0.9rem" }}>Awaiting GHL API key / Location ID — pipeline data will appear once connected.</p>
               ) : (
-                <div className="funnel">
-                  <div className="funnel-step">
-                    <span className="num">{fmt(klaviyo?.received || 0)}</span>
-                    <span className="label">Received</span>
+                <>
+                  <div className="kpi-grid" style={{ marginBottom: 16 }}>
+                    <div className="kpi-card">
+                      <div className="kpi-label">Total Leads</div>
+                      <div className="kpi-value">{fmt(ghl?.totalLeads || 0)}</div>
+                    </div>
+                    <div className="kpi-card">
+                      <div className="kpi-label">Pipeline Value</div>
+                      <div className="kpi-value">{fmt(ghl?.pipelineValue || 0, "currency")}</div>
+                    </div>
+                    <div className="kpi-card">
+                      <div className="kpi-label">Won Deals</div>
+                      <div className="kpi-value" style={{ color: "var(--success)" }}>{fmt(ghl?.wonDeals || 0)}</div>
+                    </div>
+                    <div className="kpi-card">
+                      <div className="kpi-label">Won Revenue</div>
+                      <div className="kpi-value" style={{ color: "var(--success)" }}>{fmt(ghl?.wonRevenue || 0, "currency")}</div>
+                    </div>
                   </div>
-                  <div className="funnel-step">
-                    <span className="num">{fmt(klaviyo?.opened || 0)}</span>
-                    <span className="label">Opened</span>
-                  </div>
-                  <div className="funnel-step">
-                    <span className="num">{fmt(klaviyo?.clicked || 0)}</span>
-                    <span className="label">Clicked</span>
-                  </div>
-                  <div className="funnel-step">
-                    <span className="num">{fmt(klaviyo?.bounced || 0)}</span>
-                    <span className="label">Bounced</span>
-                  </div>
-                  <div className="funnel-step">
-                    <span className="num">{fmt(klaviyo?.placedOrder || 0)}</span>
-                    <span className="label">Placed Order</span>
-                  </div>
-                </div>
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Stage</th>
+                        <th className="num">Count</th>
+                        <th className="num">Value</th>
+                        <th className="num">% of Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(ghl?.stageBreakdown || []).length === 0 ? (
+                        <tr><td colSpan={4} style={{ color: "var(--muted)" }}>No pipeline data</td></tr>
+                      ) : (
+                        ghl!.stageBreakdown.map((s, i) => (
+                          <tr key={i}>
+                            <td>{s.stage}</td>
+                            <td className="num">{s.count}</td>
+                            <td className="num">{fmt(s.value, "currency")}</td>
+                            <td className="num">{(ghl!.totalLeads > 0 ? (s.count / ghl!.totalLeads) * 100 : 0).toFixed(1)}%</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </>
               )}
             </div>
 
@@ -469,16 +495,16 @@ export default function Dashboard() {
                   <div className="conn-name">Shopify</div>
                   <div className="conn-status">
                     <Badge status={shopify?.status || "error"} />
-                    {shopify?.status === "pending_token" && <span style={{ marginLeft: 8 }}>Admin token needed</span>}
+                    {shopify?.status === "pending_token" && <span style={{ marginLeft: 8 }}>Client credentials needed</span>}
                     {shopify?.status === "live" && <span style={{ marginLeft: 8 }}>{shopify.orderCount} orders</span>}
                   </div>
                 </div>
                 <div className="conn-card">
-                  <div className="conn-name">Klaviyo</div>
+                  <div className="conn-name">Go High Level</div>
                   <div className="conn-status">
-                    <Badge status={klaviyo?.status || "error"} />
-                    {klaviyo?.status === "pending_token" && <span style={{ marginLeft: 8 }}>API key pending verification</span>}
-                    {klaviyo?.status === "live" && <span style={{ marginLeft: 8 }}>{fmt(klaviyo.received)} emails sent</span>}
+                    <Badge status={ghl?.status || "error"} />
+                    {ghl?.status === "pending_token" && <span style={{ marginLeft: 8 }}>API key / Location ID needed</span>}
+                    {ghl?.status === "live" && <span style={{ marginLeft: 8 }}>{fmt(ghl.totalLeads)} leads in pipeline</span>}
                   </div>
                 </div>
               </div>

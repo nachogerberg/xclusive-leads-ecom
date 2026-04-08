@@ -1,3 +1,15 @@
 {
+  "_env_notes": {
+    "META_ACCESS_TOKEN": "Facebook Graph API long-lived token",
+    "META_AD_ACCOUNT_ID": "Facebook Ad Account ID (without act_ prefix)",
+    "SHOPIFY_CLIENT_ID": "Shopify app client ID for client_credentials grant",
+    "SHOPIFY_CLIENT_SECRET": "Shopify app client secret",
+    "SHOPIFY_SHOP_DOMAIN": "e.g. xclusive-agent-leads.myshopify.com",
+    "GHL_API_KEY": "Go High Level API Bearer token",
+    "GHL_LOCATION_ID": "GHL Location ID (PIT token from location key)",
+    "SUPABASE_URL": "Supabase project URL",
+    "SUPABASE_SERVICE_ROLE_KEY": "Supabase service role key",
+    "CRON_SECRET": "Shared secret for cron endpoint auth"
+  },
   "crons": [{"path": "/api/cron/daily", "schedule": "0 11 * * *"}]
 }

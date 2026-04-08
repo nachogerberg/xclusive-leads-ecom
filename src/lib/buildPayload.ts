@@ -1,20 +1,20 @@
 import { fetchMeta, type MetaData } from "./meta";
 import { fetchShopify, type ShopifyData } from "./shopify";
-import { fetchKlaviyo, type KlaviyoData } from "./klaviyo";
+import { fetchGHL, type GHLData } from "./ghl";
 
 export interface DashboardPayload {
   range: string;
   syncedAt: string;
   meta: MetaData;
   shopify: ShopifyData;
-  klaviyo: KlaviyoData;
+  ghl: GHLData;
 }
 
 export async function buildPayload(range: string = "30d"): Promise<DashboardPayload> {
-  const [meta, shopify, klaviyo] = await Promise.all([
+  const [meta, shopify, ghl] = await Promise.all([
     fetchMeta(range),
     fetchShopify(range),
-    fetchKlaviyo(range),
+    fetchGHL(range),
   ]);
 
   return {
@@ -22,6 +22,6 @@ export async function buildPayload(range: string = "30d"): Promise<DashboardPayl
     syncedAt: new Date().toISOString(),
     meta,
     shopify,
-    klaviyo,
+    ghl,
   };
 }
