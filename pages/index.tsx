@@ -15,12 +15,53 @@ interface MetaSummary {
 }
 
 interface Campaign {
+  id: string;
   name: string;
   spend: number;
   impressions: number;
   clicks: number;
   ctr: number;
   purchases: number;
+  purchaseValue: number;
+  roas: number;
+  leads: number;
+  cpl: number;
+  cpp: number;
+}
+
+interface MetaAdSet {
+  id: string;
+  name: string;
+  campaignId: string;
+  campaignName: string;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  cpc: number;
+  leads: number;
+  purchases: number;
+  purchaseValue: number;
+  cpl: number;
+  cpp: number;
+  roas: number;
+}
+
+interface MetaAd {
+  id: string;
+  name: string;
+  adsetId: string;
+  adsetName: string;
+  campaignId: string;
+  campaignName: string;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  leads: number;
+  purchases: number;
+  cpl: number;
+  cpp: number;
   purchaseValue: number;
   roas: number;
 }
@@ -56,6 +97,8 @@ interface DashboardData {
     error?: string;
     summary: MetaSummary;
     campaigns: Campaign[];
+    adsets: MetaAdSet[];
+    ads: MetaAd[];
     daily: DailySpend[];
   };
   shopify: {
@@ -84,6 +127,22 @@ const fmt = (n: number, style: "currency" | "decimal" | "percent" = "decimal", d
   if (style === "percent") return n.toFixed(decimals) + "%";
   return n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: decimals });
 };
+
+function cplBadge(cpl: number, leads: number): { color: string; bg: string; label: string } {
+  if (leads === 0) return { color: "#94a3b8", bg: "#1e293b", label: "No leads" };
+  if (cpl < 10) return { color: "#10b981", bg: "#064e3b", label: `$${cpl.toFixed(2)}` };
+  if (cpl <= 25) return { color: "#f59e0b", bg: "#451a03", label: `$${cpl.toFixed(2)}` };
+  return { color: "#ef4444", bg: "#450a0a", label: `$${cpl.toFixed(2)}` };
+}
+
+function CplPill({ cpl, leads }: { cpl: number; leads: number }) {
+  const b = cplBadge(cpl, leads);
+  return (
+    <span style={{ color: b.color, background: b.bg, fontSize: 11, padding: "2px 8px", borderRadius: 12, whiteSpace: "nowrap" }}>
+      {b.label}
+    </span>
+  );
+}
 
 function Badge({ status }: { status: string }) {
   if (status === "live") return <span className="badge badge-live">Live</span>;
@@ -189,6 +248,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [campaignsExpanded, setCampaignsExpanded] = useState(true);
+  const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(new Set());
+  const [expandedAdsets, setExpandedAdsets] = useState<Set<string>>(new Set());
 
   const fetchData = useCallback(async (r: string) => {
     setLoading(true);
@@ -341,7 +402,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Meta Campaign Table */}
+            {/* Meta Campaign > AdSet > Ad Tree */}
             <div className="section">
               <div className="section-header">
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -353,40 +414,137 @@ export default function Dashboard() {
                 </button>
               </div>
               {meta?.error && <p style={{ color: "var(--error)", fontSize: "0.85rem", marginBottom: 12 }}>{meta.error}</p>}
-              {campaignsExpanded && (
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Campaign</th>
-                      <th className="num">Spend</th>
-                      <th className="num">Impressions</th>
-                      <th className="num">Clicks</th>
-                      <th className="num">CTR</th>
-                      <th className="num">Purchases</th>
-                      <th className="num">Revenue</th>
-                      <th className="num">ROAS</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(meta?.campaigns || []).length === 0 ? (
-                      <tr><td colSpan={8} style={{ color: "var(--muted)" }}>No campaign data</td></tr>
-                    ) : (
-                      meta!.campaigns.map((c, i) => (
-                        <tr key={i}>
-                          <td>{c.name}</td>
-                          <td className="num">{fmt(c.spend, "currency")}</td>
-                          <td className="num">{fmt(c.impressions)}</td>
-                          <td className="num">{fmt(c.clicks)}</td>
-                          <td className="num">{fmt(c.ctr, "percent")}</td>
-                          <td className="num">{fmt(c.purchases)}</td>
-                          <td className="num">{fmt(c.purchaseValue, "currency")}</td>
-                          <td className="num">{c.roas.toFixed(2)}x</td>
+              {campaignsExpanded && (() => {
+                const campaigns = meta?.campaigns || [];
+                const adsets = meta?.adsets || [];
+                const ads = meta?.ads || [];
+                const adsetsByCampaign = new Map<string, MetaAdSet[]>();
+                adsets.forEach((as) => {
+                  const list = adsetsByCampaign.get(as.campaignId) || [];
+                  list.push(as);
+                  adsetsByCampaign.set(as.campaignId, list);
+                });
+                const adsByAdset = new Map<string, MetaAd[]>();
+                ads.forEach((ad) => {
+                  const list = adsByAdset.get(ad.adsetId) || [];
+                  list.push(ad);
+                  adsByAdset.set(ad.adsetId, list);
+                });
+
+                const toggleCampaign = (id: string) => {
+                  setExpandedCampaigns((prev) => {
+                    const next = new Set(prev);
+                    next.has(id) ? next.delete(id) : next.add(id);
+                    return next;
+                  });
+                };
+                const toggleAdset = (id: string) => {
+                  setExpandedAdsets((prev) => {
+                    const next = new Set(prev);
+                    next.has(id) ? next.delete(id) : next.add(id);
+                    return next;
+                  });
+                };
+
+                return (
+                  <div style={{ overflowX: "auto" }}>
+                    <table className="data-table" style={{ borderCollapse: "collapse", width: "100%" }}>
+                      <thead>
+                        <tr style={{ position: "sticky", top: 0, background: "#0a0a0a", color: "#94a3b8", fontSize: 12, textTransform: "uppercase" as const }}>
+                          <th style={{ textAlign: "left", padding: "8px 12px" }}>Name</th>
+                          <th className="num">Spend</th>
+                          <th className="num">Impr</th>
+                          <th className="num">Clicks</th>
+                          <th className="num">CTR</th>
+                          <th className="num">Leads</th>
+                          <th className="num">CPL</th>
+                          <th className="num">Purchases</th>
+                          <th className="num">ROAS</th>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              )}
+                      </thead>
+                      <tbody>
+                        {campaigns.length === 0 ? (
+                          <tr><td colSpan={9} style={{ color: "var(--muted)" }}>No campaign data</td></tr>
+                        ) : (
+                          campaigns.map((c) => {
+                            const cExpanded = expandedCampaigns.has(c.id);
+                            const cAdsets = adsetsByCampaign.get(c.id) || [];
+                            return [
+                              <tr
+                                key={`c-${c.id}`}
+                                style={{ background: "#161616", fontWeight: 600, borderLeft: "3px solid #6366f1", cursor: "pointer" }}
+                                onClick={() => toggleCampaign(c.id)}
+                                onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.85")}
+                                onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+                              >
+                                <td style={{ padding: "8px 12px" }}>
+                                  <span style={{ color: "#6366f1", marginRight: 8 }}>{cExpanded ? "\u25BC" : "\u25B6"}</span>
+                                  {c.name}
+                                </td>
+                                <td className="num">{fmt(c.spend, "currency")}</td>
+                                <td className="num">{fmt(c.impressions)}</td>
+                                <td className="num">{fmt(c.clicks)}</td>
+                                <td className="num">{fmt(c.ctr, "percent")}</td>
+                                <td className="num">{fmt(c.leads)}</td>
+                                <td className="num"><CplPill cpl={c.cpl} leads={c.leads} /></td>
+                                <td className="num">{fmt(c.purchases)}</td>
+                                <td className="num">{c.roas.toFixed(2)}x</td>
+                              </tr>,
+                              ...(cExpanded ? cAdsets.map((as) => {
+                                const asExpanded = expandedAdsets.has(as.id);
+                                const asAds = adsByAdset.get(as.id) || [];
+                                return [
+                                  <tr
+                                    key={`as-${as.id}`}
+                                    style={{ background: "#111111", fontWeight: 500, borderLeft: "3px solid #334155", cursor: "pointer" }}
+                                    onClick={() => toggleAdset(as.id)}
+                                    onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.85")}
+                                    onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+                                  >
+                                    <td style={{ padding: "8px 12px", paddingLeft: 24 }}>
+                                      <span style={{ color: "#6366f1", marginRight: 8 }}>{asExpanded ? "\u25BC" : "\u25B6"}</span>
+                                      {as.name}
+                                    </td>
+                                    <td className="num">{fmt(as.spend, "currency")}</td>
+                                    <td className="num">{fmt(as.impressions)}</td>
+                                    <td className="num">{fmt(as.clicks)}</td>
+                                    <td className="num">{fmt(as.ctr, "percent")}</td>
+                                    <td className="num">{fmt(as.leads)}</td>
+                                    <td className="num"><CplPill cpl={as.cpl} leads={as.leads} /></td>
+                                    <td className="num">{fmt(as.purchases)}</td>
+                                    <td className="num">{as.roas.toFixed(2)}x</td>
+                                  </tr>,
+                                  ...(asExpanded ? asAds.map((ad) => (
+                                    <tr
+                                      key={`ad-${ad.id}`}
+                                      style={{ background: "#0d0d0d", fontWeight: 400, borderLeft: "3px solid #1e293b" }}
+                                      onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.85")}
+                                      onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+                                    >
+                                      <td style={{ padding: "8px 12px", paddingLeft: 40 }}>
+                                        <span style={{ color: "#475569", marginRight: 8 }}>&bull;</span>
+                                        {ad.name}
+                                      </td>
+                                      <td className="num">{fmt(ad.spend, "currency")}</td>
+                                      <td className="num">{fmt(ad.impressions)}</td>
+                                      <td className="num">{fmt(ad.clicks)}</td>
+                                      <td className="num">{fmt(ad.ctr, "percent")}</td>
+                                      <td className="num">{fmt(ad.leads)}</td>
+                                      <td className="num"><CplPill cpl={ad.cpl} leads={ad.leads} /></td>
+                                      <td className="num">{fmt(ad.purchases)}</td>
+                                      <td className="num">{ad.roas.toFixed(2)}x</td>
+                                    </tr>
+                                  )) : []),
+                                ];
+                              }).flat() : []),
+                            ];
+                          }).flat()
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Daily Spend + Revenue Chart */}
