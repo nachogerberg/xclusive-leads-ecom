@@ -213,7 +213,7 @@ export default function Dashboard() {
       await fetch("/api/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ range }),
+        body: JSON.stringify({}),
       });
       await fetchData(range);
     } finally {
@@ -258,6 +258,23 @@ export default function Dashboard() {
             )}
           </div>
         </div>
+
+        {/* Cache Status Bar */}
+        {data && (
+          <div className="cache-status-bar" style={{ display: "flex", alignItems: "center", gap: 16, padding: "8px 16px", background: "var(--surface)", borderRadius: 8, marginBottom: 16, fontSize: "0.85rem", color: "var(--muted)" }}>
+            {data.syncedAt && (
+              <span>Last synced: {(() => {
+                const mins = Math.round((Date.now() - new Date(data.syncedAt).getTime()) / 60000);
+                if (mins < 1) return "just now";
+                if (mins === 1) return "1 minute ago";
+                if (mins < 60) return `${mins} minutes ago`;
+                const hrs = Math.round(mins / 60);
+                return hrs === 1 ? "1 hour ago" : `${hrs} hours ago`;
+              })()}</span>
+            )}
+            <span>{data.source === "cache" ? "Source: Cache \u2713" : "Source: Live \u26A1"}</span>
+          </div>
+        )}
 
         {loading && !data ? (
           <div className="loading-overlay">

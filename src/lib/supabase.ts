@@ -35,3 +35,17 @@ export async function cacheSet(key: string, value: unknown): Promise<void> {
     { onConflict: "cache_key" }
   );
 }
+
+export async function cacheSyncLog(date: string, results: unknown): Promise<void> {
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  await supabase.from(TABLE).upsert(
+    {
+      cache_key: `${PREFIX}sync_log:${date}`,
+      data: results,
+      expires_at: expiresAt,
+      created_at: new Date().toISOString(),
+    },
+    { onConflict: "cache_key" }
+  );
+}

@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { cacheGet } from "@/src/lib/supabase";
+import { cacheGet, cacheSet } from "@/src/lib/supabase";
 import { buildPayload, type DashboardPayload } from "@/src/lib/buildPayload";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -12,7 +12,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({ source: "cache", ...cached });
   }
 
-  // Fetch live
+  // Fetch live + save to cache
   const payload = await buildPayload(range);
+  await cacheSet(cacheKey, payload);
   return res.status(200).json({ source: "live", ...payload });
 }
