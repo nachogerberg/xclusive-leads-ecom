@@ -73,7 +73,7 @@ export interface MetaData {
     roas: number;
   };
   campaigns: Array<{
-    id: string;
+    id?: string;
     name: string;
     spend: number;
     impressions: number;
@@ -211,7 +211,7 @@ export async function fetchMeta(range: string = "30d"): Promise<MetaData> {
       const cPurchaseValue = extractPurchaseValue(c.action_values);
       const cLeads = extractLeads(c.actions);
       return {
-        id: c.campaign_id || "",
+        id: c.campaign_id || c.campaign_name || String(Math.random()),
         name: c.campaign_name || "Unknown",
         spend: cSpend,
         impressions: parseInt(c.impressions),

@@ -14,8 +14,12 @@ interface MetaSummary {
   roas: number;
 }
 
+function safeRender(fn: () => React.ReactNode): React.ReactNode {
+  try { return fn(); } catch(e) { return <div style={{color:"#ef4444",padding:"1rem"}}>Error rendering campaigns: {String(e)}</div>; }
+}
+
 interface Campaign {
-  id: string;
+  id?: string;
   name: string;
   spend: number;
   impressions: number;
@@ -414,7 +418,7 @@ export default function Dashboard() {
                 </button>
               </div>
               {meta?.error && <p style={{ color: "var(--error)", fontSize: "0.85rem", marginBottom: 12 }}>{meta.error}</p>}
-              {campaignsExpanded && (() => {
+              {campaignsExpanded && safeRender(() => {
                 const campaigns = meta?.campaigns || [];
                 const adsets = meta?.adsets || [];
                 const ads = meta?.ads || [];
@@ -467,13 +471,14 @@ export default function Dashboard() {
                           <tr><td colSpan={9} style={{ color: "var(--muted)" }}>No campaign data</td></tr>
                         ) : (
                           campaigns.map((c) => {
-                            const cExpanded = expandedCampaigns.has(c.id);
-                            const cAdsets = adsetsByCampaign.get(c.id) || [];
+                            const cKey = c.id || c.name;
+                            const cExpanded = expandedCampaigns.has(cKey);
+                            const cAdsets = adsetsByCampaign.get(cKey) || [];
                             return [
                               <tr
-                                key={`c-${c.id}`}
+                                key={`c-${cKey}`}
                                 style={{ background: "#161616", fontWeight: 600, borderLeft: "3px solid #6366f1", cursor: "pointer" }}
-                                onClick={() => toggleCampaign(c.id)}
+                                onClick={() => toggleCampaign(cKey)}
                                 onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.85")}
                                 onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
                               >
@@ -544,7 +549,7 @@ export default function Dashboard() {
                     </table>
                   </div>
                 );
-              })()}
+              })}
             </div>
 
             {/* Daily Spend + Revenue Chart */}
