@@ -56,7 +56,7 @@ export async function fetchGHL(range: string = "30d"): Promise<GHLData> {
     // Fetch opportunities and contacts in parallel
     const [oppsRes, contactsRes] = await Promise.all([
       ghlFetch(`/opportunities/search?location_id=${locationId}&limit=100`, apiKey),
-      ghlFetch(`/contacts/?locationId=${locationId}&limit=100&sortBy=dateAdded&sortDirection=desc`, apiKey),
+      ghlFetch(`/contacts/?locationId=${locationId}&limit=100&sortBy=date_added`, apiKey),
     ]) as [
       { opportunities?: Array<{ status?: string; monetaryValue?: number; stageName?: string }> },
       { contacts?: Array<{ dateAdded?: string }> }
