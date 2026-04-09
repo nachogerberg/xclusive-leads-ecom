@@ -41,6 +41,10 @@ async function getShopifyToken(): Promise<string> {
 }
 
 function dateRange(range: string): { start: string; end: string } {
+  if (range.startsWith("custom:")) {
+    const [, from, to] = range.split(":");
+    return { start: new Date(from).toISOString(), end: new Date(to + "T23:59:59").toISOString() };
+  }
   const end = new Date();
   const start = new Date();
   if (range === "7d") start.setDate(end.getDate() - 7);
@@ -67,7 +71,7 @@ export async function fetchShopify(range: string = "30d"): Promise<ShopifyData> 
     const token = await getShopifyToken();
 
     const res = await fetch(
-      `https://${domain}/admin/api/2024-01/orders.json?status=any&created_at_min=${start}&created_at_max=${end}&limit=250`,
+      `https://${domain}/admin/api/2024-01/orders.json?financial_status=paid&status=any&created_at_min=${start}&created_at_max=${end}&limit=250`,
       {
         headers: {
           "X-Shopify-Access-Token": token,

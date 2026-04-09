@@ -73,6 +73,11 @@ export default function CampaignsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [range, setRange] = useState<"7d" | "30d" | "90d">("30d");
+  const [customMode, setCustomMode] = useState(false);
+  const [customFromMonth, setCustomFromMonth] = useState(1);
+  const [customToMonth, setCustomToMonth] = useState(new Date().getMonth() + 1);
+  const [pieTooltip, setPieTooltip] = useState<{label: string; count: number; pct: number; x: number; y: number} | null>(null);
+  const [barTooltip, setBarTooltip] = useState<{label: string; count: number; x: number; y: number} | null>(null);
 
   useEffect(() => {
     fetch("/api/leadpkg")
@@ -89,11 +94,17 @@ export default function CampaignsPage() {
 
   const filtered = useMemo(() => {
     let list = rows;
-    if (range === "7d") list = list.filter((r) => r.mes === currentMonth);
-    else if (range === "30d") list = list.filter((r) => r.mes >= currentMonth - 1 && r.mes <= currentMonth);
-    else list = list.filter((r) => r.mes >= currentMonth - 2 && r.mes <= currentMonth);
+    if (customMode) {
+      list = list.filter((r) => r.mes >= customFromMonth && r.mes <= customToMonth);
+    } else if (range === "7d") {
+      list = list.filter((r) => r.mes === currentMonth);
+    } else if (range === "30d") {
+      list = list.filter((r) => r.mes >= currentMonth - 1 && r.mes <= currentMonth);
+    } else {
+      list = list.filter((r) => r.mes >= currentMonth - 2 && r.mes <= currentMonth);
+    }
     return list;
-  }, [rows, range, currentMonth]);
+  }, [rows, range, currentMonth, customMode, customFromMonth, customToMonth]);
 
   const totals = useMemo(() => {
     return filtered.reduce(
@@ -172,10 +183,19 @@ export default function CampaignsPage() {
       return { ...d, startAngle, endAngle: cumAngle, color: PIE_COLORS[i % PIE_COLORS.length] };
     });
     return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", position: "relative" }}>
         <svg width={200} height={200} viewBox="0 0 200 200">
           {slices.map((s, i) => (
-            <path key={i} d={describeArc(100, 100, 90, s.startAngle, s.endAngle)} fill={s.color} stroke="#111111" strokeWidth={1} />
+            <path
+              key={i}
+              d={describeArc(100, 100, 90, s.startAngle, s.endAngle)}
+              fill={s.color}
+              stroke="#111111"
+              strokeWidth={1}
+              cursor="pointer"
+              onMouseMove={(e) => setPieTooltip({ label: s.name, count: s.count, pct: s.pct, x: e.clientX, y: e.clientY })}
+              onMouseLeave={() => setPieTooltip(null)}
+            />
           ))}
         </svg>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 12, justifyContent: "center" }}>
@@ -219,7 +239,12 @@ export default function CampaignsPage() {
             const y = chartH - barH + 10;
             return (
               <g key={i}>
-                <rect x={x} y={y} width={barW} height={barH} fill="#f97316" rx={3} />
+                <rect
+                  x={x} y={y} width={barW} height={barH} fill="#f97316" rx={3}
+                  cursor="pointer"
+                  onMouseMove={(e) => setBarTooltip({ label, count, x: e.clientX, y: e.clientY })}
+                  onMouseLeave={() => setBarTooltip(null)}
+                />
                 <text x={x + barW / 2} y={y - 4} fill="#f1f5f9" fontSize={11} textAnchor="middle" fontWeight={600}>{count}</text>
                 <text x={x + barW / 2} y={chartH + 26} fill="#94a3b8" fontSize={9} textAnchor="middle">{label.length > 10 ? label.slice(0, 10) : label}</text>
               </g>
@@ -283,13 +308,42 @@ export default function CampaignsPage() {
               {RANGE_OPTIONS.map((o) => (
                 <button
                   key={o.key}
-                  className={`range-btn ${range === o.key ? "active" : ""}`}
-                  onClick={() => setRange(o.key)}
+                  className={`range-btn ${!customMode && range === o.key ? "active" : ""}`}
+                  onClick={() => { setCustomMode(false); setRange(o.key); }}
                 >
                   {o.label}
                 </button>
               ))}
+              <button
+                className={`range-btn ${customMode ? "active" : ""}`}
+                onClick={() => setCustomMode(!customMode)}
+              >
+                Custom
+              </button>
             </div>
+            {customMode && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <select
+                  value={customFromMonth}
+                  onChange={(e) => setCustomFromMonth(Number(e.target.value))}
+                  style={{ background: "#111111", color: "#f1f5f9", border: "1px solid #1e1e1e", borderRadius: 8, padding: "6px 12px" }}
+                >
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                    <option key={m} value={m}>{new Date(2026, m - 1).toLocaleString("en-US", { month: "short" })}</option>
+                  ))}
+                </select>
+                <span style={{ color: "#94a3b8" }}>to</span>
+                <select
+                  value={customToMonth}
+                  onChange={(e) => setCustomToMonth(Number(e.target.value))}
+                  style={{ background: "#111111", color: "#f1f5f9", border: "1px solid #1e1e1e", borderRadius: 8, padding: "6px 12px" }}
+                >
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                    <option key={m} value={m}>{new Date(2026, m - 1).toLocaleString("en-US", { month: "short" })}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </div>
 
@@ -375,6 +429,33 @@ export default function CampaignsPage() {
           </>
         )}
       </div>
+
+      {/* Pie chart tooltip */}
+      {pieTooltip && (
+        <div style={{
+          position: "fixed", left: pieTooltip.x + 12, top: pieTooltip.y - 10,
+          background: "#1e293b", border: "1px solid #334155", borderRadius: 8,
+          padding: "8px 12px", fontSize: 12, color: "#f1f5f9",
+          pointerEvents: "none", zIndex: 1000, whiteSpace: "nowrap"
+        }}>
+          <div style={{fontWeight:600}}>{pieTooltip.label}</div>
+          <div>Count: {pieTooltip.count} packages</div>
+          <div>{pieTooltip.pct.toFixed(1)}% del total</div>
+        </div>
+      )}
+
+      {/* Bar chart tooltip */}
+      {barTooltip && (
+        <div style={{
+          position: "fixed", left: barTooltip.x + 12, top: barTooltip.y - 10,
+          background: "#1e293b", border: "1px solid #334155", borderRadius: 8,
+          padding: "8px 12px", fontSize: 12, color: "#f1f5f9",
+          pointerEvents: "none", zIndex: 1000, whiteSpace: "nowrap"
+        }}>
+          <div style={{fontWeight:600}}>{barTooltip.label}</div>
+          <div>Count: {barTooltip.count} packages</div>
+        </div>
+      )}
     </>
   );
 }

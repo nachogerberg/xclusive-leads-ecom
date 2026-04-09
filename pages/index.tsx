@@ -233,6 +233,9 @@ function SpendRevenueChart({ daily, dailyRevenue }: { daily: DailySpend[]; daily
 
 export default function Dashboard() {
   const [range, setRange] = useState<string>("30d");
+  const [customMode, setCustomMode] = useState(false);
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -290,13 +293,47 @@ export default function Dashboard() {
               {["7d", "30d", "90d"].map((r) => (
                 <button
                   key={r}
-                  className={`range-btn ${range === r ? "active" : ""}`}
-                  onClick={() => setRange(r)}
+                  className={`range-btn ${!customMode && range === r ? "active" : ""}`}
+                  onClick={() => { setCustomMode(false); setRange(r); }}
                 >
                   {r.toUpperCase()}
                 </button>
               ))}
+              <button
+                className={`range-btn ${customMode ? "active" : ""}`}
+                onClick={() => setCustomMode(!customMode)}
+              >
+                Custom
+              </button>
             </div>
+            {customMode && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input
+                  type="date"
+                  value={customFrom}
+                  onChange={(e) => setCustomFrom(e.target.value)}
+                  style={{ background: "#111111", color: "#f1f5f9", border: "1px solid #1e1e1e", borderRadius: 8, padding: "6px 12px" }}
+                />
+                <span style={{ color: "#94a3b8" }}>to</span>
+                <input
+                  type="date"
+                  value={customTo}
+                  onChange={(e) => setCustomTo(e.target.value)}
+                  style={{ background: "#111111", color: "#f1f5f9", border: "1px solid #1e1e1e", borderRadius: 8, padding: "6px 12px" }}
+                />
+                <button
+                  className="sync-btn"
+                  disabled={!customFrom || !customTo}
+                  onClick={() => {
+                    const r = `custom:${customFrom}:${customTo}`;
+                    setRange(r);
+                    fetchData(r);
+                  }}
+                >
+                  Apply
+                </button>
+              </div>
+            )}
             <button className="sync-btn" onClick={handleSync} disabled={syncing}>
               {syncing ? "Syncing..." : "Sync Now"}
             </button>
