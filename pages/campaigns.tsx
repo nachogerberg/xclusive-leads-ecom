@@ -19,9 +19,10 @@ interface LeadPkgRow {
   [key: string]: unknown;
 }
 
-const MONTHS = [
-  "Todos", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+const RANGE_OPTIONS: { key: "7d" | "30d" | "90d"; label: string }[] = [
+  { key: "7d", label: "7D" },
+  { key: "30d", label: "1M" },
+  { key: "90d", label: "3M" },
 ];
 
 const fmt = (n: number | null | undefined, style: "currency" | "decimal" = "decimal") => {
@@ -67,15 +68,11 @@ const labelStyle: React.CSSProperties = { color: "#94a3b8", fontSize: 12, textTr
 const valueStyle: React.CSSProperties = { color: "#f1f5f9", fontSize: 24, fontWeight: 700 };
 const tinyHeaderStyle: React.CSSProperties = { color: "#94a3b8", fontSize: 11, textTransform: "uppercase", textAlign: "left", padding: "6px 8px", borderBottom: "1px solid #1e1e1e" };
 
-type SortKey = "campaign_name" | "agent_name" | "mes" | "gasto" | "ingreso" | "leads" | "cpl" | "profit" | "completado";
-
 export default function CampaignsPage() {
   const [rows, setRows] = useState<LeadPkgRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [monthFilter, setMonthFilter] = useState(0);
-  const [sortKey, setSortKey] = useState<SortKey>("mes");
-  const [sortAsc, setSortAsc] = useState(true);
+  const [range, setRange] = useState<"7d" | "30d" | "90d">("30d");
 
   useEffect(() => {
     fetch("/api/leadpkg")
@@ -88,16 +85,15 @@ export default function CampaignsPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  const currentMonth = new Date().getMonth() + 1;
+
   const filtered = useMemo(() => {
     let list = rows;
-    if (monthFilter > 0) list = list.filter((r) => r.mes === monthFilter);
-    return [...list].sort((a, b) => {
-      const av = a[sortKey] ?? 0;
-      const bv = b[sortKey] ?? 0;
-      if (typeof av === "string" && typeof bv === "string") return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
-      return sortAsc ? (av as number) - (bv as number) : (bv as number) - (av as number);
-    });
-  }, [rows, monthFilter, sortKey, sortAsc]);
+    if (range === "7d") list = list.filter((r) => r.mes === currentMonth);
+    else if (range === "30d") list = list.filter((r) => r.mes >= currentMonth - 1 && r.mes <= currentMonth);
+    else list = list.filter((r) => r.mes >= currentMonth - 2 && r.mes <= currentMonth);
+    return list;
+  }, [rows, range, currentMonth]);
 
   const totals = useMemo(() => {
     return filtered.reduce(
@@ -163,21 +159,6 @@ export default function CampaignsPage() {
       return na - nb;
     });
   }, [filtered]);
-
-  const handleSort = (key: SortKey) => {
-    if (sortKey === key) setSortAsc(!sortAsc);
-    else { setSortKey(key); setSortAsc(true); }
-  };
-
-  const SortHeader = ({ label, k }: { label: string; k: SortKey }) => (
-    <th
-      className="num"
-      style={{ cursor: "pointer", userSelect: "none" }}
-      onClick={() => handleSort(k)}
-    >
-      {label} {sortKey === k ? (sortAsc ? "▲" : "▼") : ""}
-    </th>
-  );
 
   /* ── Pie chart builder ── */
   const renderPie = () => {
@@ -298,18 +279,17 @@ export default function CampaignsPage() {
             <p style={{ color: "var(--muted)", fontSize: "0.85rem", marginTop: 4 }}>Solo campañas PPL — Todo el año 2026</p>
           </div>
           <div className="header-controls">
-            <select
-              value={monthFilter}
-              onChange={(e) => setMonthFilter(Number(e.target.value))}
-              style={{
-                background: "var(--card)", color: "var(--text)", border: "1px solid var(--border)",
-                borderRadius: 8, padding: "8px 16px", fontSize: "0.85rem",
-              }}
-            >
-              {MONTHS.map((m, i) => (
-                <option key={i} value={i}>{m}</option>
+            <div className="range-selector">
+              {RANGE_OPTIONS.map((o) => (
+                <button
+                  key={o.key}
+                  className={`range-btn ${range === o.key ? "active" : ""}`}
+                  onClick={() => setRange(o.key)}
+                >
+                  {o.label}
+                </button>
               ))}
-            </select>
+            </div>
           </div>
         </div>
 
@@ -392,70 +372,6 @@ export default function CampaignsPage() {
               </div>
             </div>
 
-            {/* ── Existing detail table ── */}
-            <div className="section">
-              <div style={{ overflowX: "auto" }}>
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <SortHeader label="Campaña" k="campaign_name" />
-                      <SortHeader label="Agente" k="agent_name" />
-                      <SortHeader label="Mes" k="mes" />
-                      <SortHeader label="Gasto" k="gasto" />
-                      <SortHeader label="Ingreso" k="ingreso" />
-                      <SortHeader label="Leads" k="leads" />
-                      <SortHeader label="CPL" k="cpl" />
-                      <SortHeader label="Profit" k="profit" />
-                      <SortHeader label="Estado" k="completado" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.length === 0 ? (
-                      <tr><td colSpan={9} style={{ color: "var(--muted)", textAlign: "center", padding: 32 }}>No hay datos de campañas</td></tr>
-                    ) : (
-                      filtered.map((r, i) => {
-                        const profit = (r.ingreso ?? 0) - (r.gasto ?? 0);
-                        const cpl = r.cpl ?? (r.leads && r.leads > 0 ? (r.gasto ?? 0) / r.leads : 0);
-                        return (
-                          <tr key={i}>
-                            <td>{r.campaign_name}</td>
-                            <td>{r.agent_name ?? "—"}</td>
-                            <td className="num">{MONTHS[r.mes] ?? r.mes}</td>
-                            <td className="num">{fmt(r.gasto, "currency")}</td>
-                            <td className="num">{fmt(r.ingreso, "currency")}</td>
-                            <td className="num">{fmt(r.leads)}</td>
-                            <td className="num"><CplPill cpl={cpl} leads={r.leads ?? 0} /></td>
-                            <td className="num" style={{ color: profit >= 0 ? "var(--success)" : "var(--error)" }}>
-                              {fmt(profit, "currency")}
-                            </td>
-                            <td className="num">
-                              {r.completado ? (
-                                <span style={{ color: "#10b981", background: "#064e3b", fontSize: 11, padding: "2px 8px", borderRadius: 12 }}>✓ Completado</span>
-                              ) : (
-                                <span style={{ color: "#94a3b8", background: "#1e293b", fontSize: 11, padding: "2px 8px", borderRadius: 12 }}>Pendiente</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                    {filtered.length > 0 && (
-                      <tr style={{ fontWeight: 700, borderTop: "2px solid var(--border)" }}>
-                        <td colSpan={3} style={{ textAlign: "right" }}>TOTALES</td>
-                        <td className="num">{fmt(totals.gasto, "currency")}</td>
-                        <td className="num">{fmt(totals.ingreso, "currency")}</td>
-                        <td className="num">{fmt(totals.leads)}</td>
-                        <td className="num">—</td>
-                        <td className="num" style={{ color: totals.profit >= 0 ? "var(--success)" : "var(--error)" }}>
-                          {fmt(totals.profit, "currency")}
-                        </td>
-                        <td />
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
           </>
         )}
       </div>
