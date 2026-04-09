@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import Head from "next/head";
+import type { AdRow, AdsSummary } from "./api/ads";
 
 interface LeadPkgRow {
   id?: number;
@@ -78,6 +79,12 @@ export default function CampaignsPage() {
   const [customToMonth, setCustomToMonth] = useState(new Date().getMonth() + 1);
   const [pieTooltip, setPieTooltip] = useState<{label: string; count: number; pct: number; x: number; y: number} | null>(null);
   const [barTooltip, setBarTooltip] = useState<{label: string; count: number; x: number; y: number} | null>(null);
+  const [ads, setAds] = useState<AdRow[]>([]);
+  const [adsSummary, setAdsSummary] = useState<AdsSummary | null>(null);
+  const [adsLoading, setAdsLoading] = useState(true);
+  const [adsPage, setAdsPage] = useState(1);
+  const [adsSearch, setAdsSearch] = useState("");
+  const ADS_PER_PAGE = 10;
 
   useEffect(() => {
     fetch("/api/leadpkg")
@@ -89,6 +96,16 @@ export default function CampaignsPage() {
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    setAdsLoading(true);
+    setAdsPage(1);
+    fetch(`/api/ads?range=${range}`)
+      .then(r => r.json())
+      .then(json => { setAds(json.ads || []); setAdsSummary(json.summary || null); })
+      .catch(console.error)
+      .finally(() => setAdsLoading(false));
+  }, [range]);
 
   const currentMonth = new Date().getMonth() + 1;
 
@@ -423,6 +440,120 @@ export default function CampaignsPage() {
                   <h3 style={{ color: "#f1f5f9", fontSize: 14, fontWeight: 600, marginBottom: 16, textAlign: "center" }}>Paquetes por Tamaño</h3>
                   {renderBarChart()}
                 </div>
+              </div>
+            </div>
+
+            {/* ── SECTION 4: Ad Performance ── */}
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+                <h2 style={{ color: "#f1f5f9", fontSize: 18, fontWeight: 700, margin: 0 }}>Performance de Anuncios</h2>
+                <span style={{ background: "#1e1b4b", color: "#a78bfa", fontSize: 11, fontWeight: 600, padding: "2px 10px", borderRadius: 12 }}>{ads.length}</span>
+              </div>
+              <div style={sectionCardStyle}>
+                <div style={{ marginBottom: 16 }}>
+                  <input
+                    type="text"
+                    placeholder="Buscar por nombre de anuncio o campaña..."
+                    value={adsSearch}
+                    onChange={(e) => { setAdsSearch(e.target.value); setAdsPage(1); }}
+                    style={{ width: "100%", background: "#0a0a0a", color: "#f1f5f9", border: "1px solid #1e1e1e", borderRadius: 8, padding: "8px 12px", fontSize: 13, outline: "none" }}
+                  />
+                </div>
+                {adsLoading ? (
+                  <div style={{ textAlign: "center", padding: 32, color: "#94a3b8" }}>
+                    <div className="spinner" style={{ margin: "0 auto 8px" }} />
+                    Cargando anuncios...
+                  </div>
+                ) : (() => {
+                  const q = adsSearch.toLowerCase();
+                  const filteredAds = q
+                    ? ads.filter(a => a.ad_name.toLowerCase().includes(q) || a.campaigns.some(c => c.toLowerCase().includes(q)))
+                    : ads;
+                  const totalPages = Math.max(1, Math.ceil(filteredAds.length / ADS_PER_PAGE));
+                  const page = Math.min(adsPage, totalPages);
+                  const pageAds = filteredAds.slice((page - 1) * ADS_PER_PAGE, page * ADS_PER_PAGE);
+                  const startIdx = (page - 1) * ADS_PER_PAGE + 1;
+                  const endIdx = Math.min(page * ADS_PER_PAGE, filteredAds.length);
+
+                  const typeBadge = (t: "wa" | "fb" | "both") => {
+                    const map = {
+                      both: { label: "BOTH", color: "#a78bfa", bg: "#1e1b4b" },
+                      wa: { label: "WA", color: "#34d399", bg: "#064e3b" },
+                      fb: { label: "FB", color: "#38bdf8", bg: "#082f49" },
+                    };
+                    const s = map[t];
+                    return <span style={{ color: s.color, background: s.bg, fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 10 }}>{s.label}</span>;
+                  };
+
+                  const cplBadge = (cpl: number, leads: number) => {
+                    if (leads === 0) return <span style={{ color: "#94a3b8", background: "#1e293b", fontSize: 11, padding: "2px 8px", borderRadius: 12 }}>N/A</span>;
+                    const color = cpl < 10 ? "#10b981" : cpl <= 25 ? "#f59e0b" : "#ef4444";
+                    const bg = cpl < 10 ? "#064e3b" : cpl <= 25 ? "#451a03" : "#450a0a";
+                    return <span style={{ color, background: bg, fontSize: 11, padding: "2px 8px", borderRadius: 12 }}>${cpl.toFixed(2)}</span>;
+                  };
+
+                  return (
+                    <>
+                      <div style={{ overflowX: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                          <thead>
+                            <tr>
+                              {["Ad", "Tipo", "# Campañas", "Spend", "Leads", "Impressiones", "Clicks", "CTR", "CPL", "CPC", "Alcance", "Freq"].map((h) => (
+                                <th key={h} style={tinyHeaderStyle}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {pageAds.length === 0 ? (
+                              <tr><td colSpan={12} style={{ color: "#94a3b8", textAlign: "center", padding: 24 }}>Sin anuncios</td></tr>
+                            ) : pageAds.map((a, i) => (
+                              <tr key={a.ad_id + i} style={{ borderBottom: "1px solid #1e1e1e" }}
+                                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.03)"; }}
+                                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                              >
+                                <td style={{ padding: "6px 8px", color: "#f1f5f9", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={a.ad_name}>{truncateName(a.ad_name, 30)}</td>
+                                <td style={{ padding: "6px 8px" }}>{typeBadge(a.account_type)}</td>
+                                <td style={{ padding: "6px 8px", textAlign: "center" }}>
+                                  <span style={{ background: "#312e81", color: "#a5b4fc", fontSize: 11, fontWeight: 600, width: 22, height: 22, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{a.campaign_count}</span>
+                                </td>
+                                <td style={{ padding: "6px 8px", color: "#f1f5f9", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmt(a.spend, "currency")}</td>
+                                <td style={{ padding: "6px 8px", color: "#f1f5f9", textAlign: "right" }}>{fmt(a.leads)}</td>
+                                <td style={{ padding: "6px 8px", color: "#f1f5f9", textAlign: "right" }}>{fmt(a.impressions)}</td>
+                                <td style={{ padding: "6px 8px", color: "#f1f5f9", textAlign: "right" }}>{fmt(a.clicks)}</td>
+                                <td style={{ padding: "6px 8px", color: "#f1f5f9", textAlign: "right" }}>{a.ctr.toFixed(2)}%</td>
+                                <td style={{ padding: "6px 8px", textAlign: "right" }}>{cplBadge(a.cpl, a.leads)}</td>
+                                <td style={{ padding: "6px 8px", color: "#f1f5f9", textAlign: "right" }}>{fmt(a.cpc, "currency")}</td>
+                                <td style={{ padding: "6px 8px", color: "#f1f5f9", textAlign: "right" }}>{fmt(a.reach)}</td>
+                                <td style={{ padding: "6px 8px", color: "#f1f5f9", textAlign: "right" }}>{a.frequency.toFixed(2)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      {/* Pagination */}
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 16, fontSize: 12, color: "#94a3b8" }}>
+                        <span>{filteredAds.length > 0 ? `${startIdx}–${endIdx} de ${filteredAds.length} anuncios` : "0 anuncios"}</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                          <button
+                            onClick={() => setAdsPage(p => Math.max(1, p - 1))}
+                            disabled={page <= 1}
+                            style={{ background: page <= 1 ? "#0a0a0a" : "#1e1e1e", color: page <= 1 ? "#475569" : "#f1f5f9", border: "1px solid #1e1e1e", borderRadius: 6, padding: "4px 12px", fontSize: 12, cursor: page <= 1 ? "default" : "pointer" }}
+                          >
+                            &larr; Anterior
+                          </button>
+                          <span>Página {page} de {totalPages}</span>
+                          <button
+                            onClick={() => setAdsPage(p => Math.min(totalPages, p + 1))}
+                            disabled={page >= totalPages}
+                            style={{ background: page >= totalPages ? "#0a0a0a" : "#1e1e1e", color: page >= totalPages ? "#475569" : "#f1f5f9", border: "1px solid #1e1e1e", borderRadius: 6, padding: "4px 12px", fontSize: 12, cursor: page >= totalPages ? "default" : "pointer" }}
+                          >
+                            Siguiente &rarr;
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
 
