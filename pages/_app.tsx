@@ -8,7 +8,6 @@ export default function App({ Component, pageProps }: AppProps) {
   const navItems = [
     { href: "/", label: "Ecom" },
     { href: "/campaigns", label: "Rendimiento de Campañas" },
-    { href: "/clients", label: "Clientes" },
   ];
 
   return (
