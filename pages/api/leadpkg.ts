@@ -30,7 +30,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .from(tableName)
       .select("*")
       .eq("year", 2026)
-      .ilike("type_of_service", "PPL")
+      .eq("type", "PPL")
       .order("mes", { ascending: true })
       .order("campaign_name", { ascending: true });
 
