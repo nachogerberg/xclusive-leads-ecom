@@ -22,6 +22,62 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* ─── Top Navbar ─── */
+.top-navbar {
+  background: #0a0a0a;
+  border-bottom: 1px solid #1e1e1e;
+  height: 56px;
+  padding: 0 24px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.navbar-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  height: 100%;
+  gap: 32px;
+}
+.navbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.navbar-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+}
+.navbar-links {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  height: 100%;
+  border-left: 1px solid #1e1e1e;
+  padding-left: 24px;
+}
+.navbar-link {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+}
+.navbar-link:hover { color: #f1f5f9; }
+.navbar-link.active {
+  color: #f97316;
+  border-bottom-color: #f97316;
+}
+
 /* ─── Layout ─── */
 .dashboard { max-width: 1400px; margin: 0 auto; padding: 24px; }
 

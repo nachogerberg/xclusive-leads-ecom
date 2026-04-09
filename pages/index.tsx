@@ -86,12 +86,6 @@ interface TopProduct {
   revenue: number;
 }
 
-interface StageBreakdown {
-  stage: string;
-  count: number;
-  value: number;
-}
-
 interface DashboardData {
   range: string;
   syncedAt: string;
@@ -114,16 +108,7 @@ interface DashboardData {
     topProducts: TopProduct[];
     dailyRevenue: DailyRevenue[];
   };
-  ghl: {
-    status: "live" | "pending_token" | "error";
-    error?: string;
-    totalLeads: number;
-    newContacts: number;
-    pipelineValue: number;
-    wonDeals: number;
-    wonRevenue: number;
-    stageBreakdown: StageBreakdown[];
-  };
+  [key: string]: unknown;
 }
 
 const fmt = (n: number, style: "currency" | "decimal" | "percent" = "decimal", decimals = 2) => {
@@ -288,19 +273,18 @@ export default function Dashboard() {
 
   const meta = data?.meta;
   const shopify = data?.shopify;
-  const ghl = data?.ghl;
 
   return (
     <>
       <Head>
-        <title>Xclusive Leads Ecom Dashboard</title>
+        <title>Ecom — Xclusive Leads</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
 
       <div className="dashboard">
         {/* Header */}
         <div className="header">
-          <h1>🛒 Xclusive Leads Ecom</h1>
+          <h1>Ecom Dashboard</h1>
           <div className="header-controls">
             <div className="range-selector">
               {["7d", "30d", "90d"].map((r) => (
@@ -352,57 +336,50 @@ export default function Dashboard() {
             <div className="kpi-grid">
               <div className="kpi-card">
                 <div className="kpi-label">Ad Spend</div>
-                <div className="kpi-value">{fmt(meta?.summary.spend || 0, "currency")}</div>
+                <div className="kpi-value">{fmt(meta?.summary?.spend ?? 0, "currency")}</div>
                 <div className="kpi-sub">{range} total</div>
               </div>
               <div className="kpi-card">
                 <div className="kpi-label">ROAS</div>
-                <div className="kpi-value" style={{ color: (meta?.summary.roas || 0) >= 2 ? "var(--success)" : "var(--warning)" }}>
-                  {(meta?.summary.roas || 0).toFixed(2)}x
+                <div className="kpi-value" style={{ color: (meta?.summary?.roas ?? 0) >= 2 ? "var(--success)" : "var(--warning)" }}>
+                  {(meta?.summary?.roas ?? 0).toFixed(2)}x
                 </div>
                 <div className="kpi-sub">Return on ad spend</div>
               </div>
               <div className="kpi-card">
                 <div className="kpi-label">CPA</div>
-                <div className="kpi-value">{fmt(meta?.summary.costPerPurchase || 0, "currency")}</div>
+                <div className="kpi-value">{fmt(meta?.summary?.costPerPurchase ?? 0, "currency")}</div>
                 <div className="kpi-sub">Cost per purchase</div>
               </div>
               <div className="kpi-card">
                 <div className="kpi-label">CTR</div>
-                <div className="kpi-value">{fmt(meta?.summary.ctr || 0, "percent")}</div>
-                <div className="kpi-sub">{fmt(meta?.summary.clicks || 0)} clicks</div>
+                <div className="kpi-value">{fmt(meta?.summary?.ctr ?? 0, "percent")}</div>
+                <div className="kpi-sub">{fmt(meta?.summary?.clicks ?? 0)} clicks</div>
               </div>
             </div>
 
-            {/* KPI Row 2 — Shopify + GHL */}
+            {/* KPI Row 2 — Shopify */}
             <div className="kpi-grid">
               <div className="kpi-card">
                 <div className="kpi-label">Revenue</div>
                 <div className="kpi-value" style={{ color: "var(--success)" }}>
-                  {shopify?.status === "pending_token" ? "Connecting..." : fmt(shopify?.revenue || 0, "currency")}
+                  {shopify?.status === "pending_token" ? "Connecting..." : fmt(shopify?.revenue ?? 0, "currency")}
                 </div>
                 <div className="kpi-sub">Shopify orders</div>
               </div>
               <div className="kpi-card">
                 <div className="kpi-label">Orders</div>
                 <div className="kpi-value">
-                  {shopify?.status === "pending_token" ? "—" : fmt(shopify?.orderCount || 0)}
+                  {shopify?.status === "pending_token" ? "—" : fmt(shopify?.orderCount ?? 0)}
                 </div>
                 <div className="kpi-sub">{range} total</div>
               </div>
               <div className="kpi-card">
                 <div className="kpi-label">AOV</div>
                 <div className="kpi-value">
-                  {shopify?.status === "pending_token" ? "—" : fmt(shopify?.aov || 0, "currency")}
+                  {shopify?.status === "pending_token" ? "—" : fmt(shopify?.aov ?? 0, "currency")}
                 </div>
                 <div className="kpi-sub">Avg order value</div>
-              </div>
-              <div className="kpi-card">
-                <div className="kpi-label">GHL Leads</div>
-                <div className="kpi-value">
-                  {ghl?.status === "pending_token" ? "Connecting..." : fmt(ghl?.totalLeads || 0)}
-                </div>
-                <div className="kpi-sub">Pipeline opportunities</div>
               </div>
             </div>
 
@@ -599,70 +576,12 @@ export default function Dashboard() {
               )}
             </div>
 
-            {/* GHL Pipeline */}
-            <div className="section">
-              <div className="section-header">
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <span className="section-title">GHL Pipeline</span>
-                  <Badge status={ghl?.status || "error"} />
-                </div>
-              </div>
-              {ghl?.status === "pending_token" ? (
-                <p style={{ color: "var(--warning)", fontSize: "0.9rem" }}>Awaiting GHL API key / Location ID — pipeline data will appear once connected.</p>
-              ) : (
-                <>
-                  <div className="kpi-grid" style={{ marginBottom: 16 }}>
-                    <div className="kpi-card">
-                      <div className="kpi-label">Total Leads</div>
-                      <div className="kpi-value">{fmt(ghl?.totalLeads || 0)}</div>
-                    </div>
-                    <div className="kpi-card">
-                      <div className="kpi-label">Pipeline Value</div>
-                      <div className="kpi-value">{fmt(ghl?.pipelineValue || 0, "currency")}</div>
-                    </div>
-                    <div className="kpi-card">
-                      <div className="kpi-label">Won Deals</div>
-                      <div className="kpi-value" style={{ color: "var(--success)" }}>{fmt(ghl?.wonDeals || 0)}</div>
-                    </div>
-                    <div className="kpi-card">
-                      <div className="kpi-label">Won Revenue</div>
-                      <div className="kpi-value" style={{ color: "var(--success)" }}>{fmt(ghl?.wonRevenue || 0, "currency")}</div>
-                    </div>
-                  </div>
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Stage</th>
-                        <th className="num">Count</th>
-                        <th className="num">Value</th>
-                        <th className="num">% of Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(ghl?.stageBreakdown || []).length === 0 ? (
-                        <tr><td colSpan={4} style={{ color: "var(--muted)" }}>No pipeline data</td></tr>
-                      ) : (
-                        ghl!.stageBreakdown.map((s, i) => (
-                          <tr key={i}>
-                            <td>{s.stage}</td>
-                            <td className="num">{s.count}</td>
-                            <td className="num">{fmt(s.value, "currency")}</td>
-                            <td className="num">{(ghl!.totalLeads > 0 ? (s.count / ghl!.totalLeads) * 100 : 0).toFixed(1)}%</td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </>
-              )}
-            </div>
-
             {/* Connection Status */}
             <div className="section">
               <div className="section-header">
                 <span className="section-title">Connection Status</span>
               </div>
-              <div className="conn-grid">
+              <div className="conn-grid" style={{ gridTemplateColumns: "repeat(2, 1fr)" }}>
                 <div className="conn-card">
                   <div className="conn-name">Meta Ads</div>
                   <div className="conn-status">
@@ -676,15 +595,7 @@ export default function Dashboard() {
                   <div className="conn-status">
                     <Badge status={shopify?.status || "error"} />
                     {shopify?.status === "pending_token" && <span style={{ marginLeft: 8 }}>Client credentials needed</span>}
-                    {shopify?.status === "live" && <span style={{ marginLeft: 8 }}>{shopify.orderCount} orders</span>}
-                  </div>
-                </div>
-                <div className="conn-card">
-                  <div className="conn-name">Go High Level</div>
-                  <div className="conn-status">
-                    <Badge status={ghl?.status || "error"} />
-                    {ghl?.status === "pending_token" && <span style={{ marginLeft: 8 }}>API key / Location ID needed</span>}
-                    {ghl?.status === "live" && <span style={{ marginLeft: 8 }}>{fmt(ghl.totalLeads)} leads in pipeline</span>}
+                    {shopify?.status === "live" && <span style={{ marginLeft: 8 }}>{shopify?.orderCount ?? 0} orders</span>}
                   </div>
                 </div>
               </div>
